@@ -5,11 +5,11 @@
 """MatMul Beam pipeline - entire matrix as side input.
 
 Run locally:
-python matmul_sideinput.py \
-    --input ../smallMat.json --output ../out/beam-py-scores
+pipenv run python matmul_sideinput.py \
+    --input ../input/smallMat.json --output ../out/beam-py-scores
 
 Run using Cloud Dataflow:
-python matmul_sideinput.py \
+pipenv run python matmul_sideinput.py \
     --runner DataflowRunner --project PROJECT_ID \
     --input gs://beam-matmul/mat/1000X16k/mat.001.json \
     --output gs://beam-matmul/output/py-beam/1000X16k-side
