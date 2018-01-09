@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017 Itamar Ostricher
 
-"""In-memory matrix multiplication + keep top-K results per column with numpy
+"""In-memory matrix multiplication + keep top-K results per row with numpy
 
 Usage:
-matmul.py [input_file]
+matmul.py [-m <input_file>] [-m <input_file> ...]
 """
 
 from __future__ import absolute_import
@@ -16,36 +16,45 @@ import logging
 import numpy as np
 
 
-def gen_cols(mat_path):
+def gen_rows(mat_path):
   with open(mat_path, 'r') as mat_f:
-    for ser_col in mat_f:
-      yield json.loads(ser_col)
+    for ser_row in mat_f:
+      yield json.loads(ser_row)
 
 
-def read_matrix(mat_path):
-  col_ids = []
-  matrix = []
-  for col in gen_cols(mat_path):
-    col_ids.append(col['id'])
-    matrix.append(col['features'])
-  return col_ids, matrix
+def read_matrix(mat_path, row_ids, matrix):
+  for row in gen_rows(mat_path):
+    row_ids.append(row['id'])
+    matrix.append(row['features'])
 
 
-def gen_matches(col_ids, matrix, top_k=1000):
+def gen_matches(row_ids, matrix, top_k):
   mult = np.dot(matrix, np.transpose(matrix))
   for i, scores in enumerate(mult):
-    top = [{'id': col_ids[l], 'score': scores[l]}
-           for l in reversed(np.argsort(scores)[-top_k:])]
-    yield {'id': col_ids[i], 'matches': top}
+    argresults = list(reversed(np.argsort(scores)[-top_k:]))
+    yield {
+        'id': row_ids[i],
+        'matches': {
+            'id': [row_ids[j] for j in argresults],
+            'score': [scores[j] for j in argresults],
+        },
+    }
 
 
-def run(mat_file):
-  col_ids, matrix = read_matrix(mat_file)
-  for match in gen_matches(col_ids, matrix):
-    print(json.dumps(match))
+def run(mat_files, top_k):
+  row_ids, matrix = [], []
+  for mat_file in mat_files:
+    read_matrix(mat_file, row_ids, matrix)
+  for match in gen_matches(row_ids, matrix, top_k):
+    print(json.dumps(match, sort_keys=True))
 
 
 if __name__ == '__main__':
-  import sys
-  mat_file = sys.argv[1] if len(sys.argv) > 1 else '../input/mat.400.16k.json'
-  run(mat_file)
+  import argparse
+  parser = argparse.ArgumentParser(
+      description='Local matrix multiplication with NumPy.')
+  parser.add_argument('-m', action='append', help='Matrix input file(s)')
+  parser.add_argument('-k', type=int, default=1000,
+                      help='Number of top results to keep')
+  args = parser.parse_args()
+  run(args.m or ['../input/mat.400.16k.json'], args.k)
